@@ -177,7 +177,7 @@ CREATE TABLE businesses (
   address         TEXT,
   city            VARCHAR(100),
   country         VARCHAR(100),
-  config          JSONB DEFAULT '{}'::jsonb,    -- Horaires, paramètres IA, tokens
+  config          JSONB DEFAULT '{}'::jsonb,    -- Horaires et paramètres métier (pas de secrets)
   ai_persona      TEXT,                          -- Nom personnalisé de l'IA
   is_active       BOOLEAN DEFAULT true,
   subscription    VARCHAR(50) DEFAULT 'free',
@@ -189,11 +189,21 @@ CREATE TABLE businesses (
 --   "working_hours": { "1": {"open":"09:00","close":"18:00"}, ... },
 --   "working_days": [1,2,3,4,5],
 --   "avg_service_duration": 45,
---   "whatsapp_token": "EAAx...",
---   "whatsapp_business_id": "123456",
+--   "timezone": "Europe/Paris",
 --   "greeting_message": "Bonjour ! Je suis l'assistante de ...",
 --   "language": "fr"
 -- }
+```
+
+```sql
+-- Secrets stockés séparément (jamais dans config JSONB)
+CREATE TABLE business_credentials (
+  business_id UUID PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
+  provider    VARCHAR(50) NOT NULL, -- whatsapp
+  token_enc   TEXT NOT NULL,        -- token chiffré AES-256-GCM
+  key_version INTEGER NOT NULL DEFAULT 1,
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ### Table: `salon_services`
@@ -265,6 +275,18 @@ CREATE TABLE conversations (
 );
 ```
 
+### Table: `webhook_events` (idempotence)
+
+```sql
+CREATE TABLE webhook_events (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  provider   VARCHAR(50) NOT NULL,   -- whatsapp
+  event_id   VARCHAR(255) NOT NULL,  -- message_id Meta
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(provider, event_id)
+);
+```
+
 ### Row Level Security — Isolation Multi-Tenant
 
 ```sql
@@ -304,7 +326,11 @@ CREATE INDEX idx_conversations_active   ON conversations(business_id, client_id,
 class WhatsAppService {
 
   async processIncomingMessage(webhookPayload) {
-    const { from, to, message } = this.parsePayload(webhookPayload);
+    const { messageId, from, to, message } = this.parsePayload(webhookPayload);
+
+    // Idempotence: ignorer les retries Meta déjà traités
+    const isDuplicate = await this.webhookEventService.isProcessed(messageId);
+    if (isDuplicate) return;
 
     // 1. Identifier le salon via le numéro destinataire
     const business = await this.businessService.findByWhatsappNumber(to);
@@ -317,7 +343,9 @@ class WhatsAppService {
     const reply = await this.aiService.processMessage({ business, client, message: message.text });
 
     // 4. Envoyer la réponse WhatsApp
-    await this.sendMessage(from, reply, business.config.whatsapp_token);
+    const token = await this.credentialsService.getWhatsappToken(business.id);
+    await this.sendMessage(from, reply, token);
+    await this.webhookEventService.markProcessed(messageId);
   }
 
   async sendMessage(to, text, token) {
@@ -349,11 +377,16 @@ class AIService {
       { role: 'user', content: message }
     ];
 
-    // 4. Appel LLM (OpenAI ou Anthropic)
-    const response = await this.callLLM(systemPrompt, messages);
+    // 4. Appel LLM avec réponse structurée imposée (JSON schema)
+    const response = await this.callLLMWithSchema({
+      systemPrompt,
+      messages,
+      schema: this.bookingSchema
+    });
 
-    // 5. Parser l'intention et les données extraites
-    const { reply, intent, data } = this.parseAIResponse(response);
+    // 5. Validation stricte avant exécution métier
+    const parsed = bookingSchemaValidator.parse(response);
+    const { reply, intent, data } = parsed;
 
     // 6. Actions selon l'intention détectée
     if (intent === 'BOOK_APPOINTMENT' && data.isComplete) {
@@ -384,7 +417,7 @@ class AIService {
       `Services disponibles:\n${services}`,
       `Horaires d'ouverture: ${hours}`,
       `Ne propose JAMAIS de créneaux en dehors des horaires d'ouverture.`,
-      `Réponds toujours en JSON: { "reply": "...", "intent": "...", "data": {} }`,
+      `Réponds uniquement via le schéma JSON fourni par l'API.`,
     ].join('\n');
   }
 }
@@ -412,13 +445,13 @@ class AppointmentService {
 
   async getAvailableSlots(businessId, date) {
     const business  = await this.businessService.findById(businessId);
-    const { working_hours, avg_service_duration } = business.config;
+    const { working_hours, avg_service_duration, timezone = 'Europe/Paris' } = business.config;
     const dayOfWeek = new Date(date).getDay();
     const hours     = working_hours[dayOfWeek];
 
     if (!hours) return []; // Jour fermé
 
-    const slots     = this.generateTimeSlots(hours.open, hours.close, avg_service_duration);
+    const slots     = this.generateTimeSlots(hours.open, hours.close, avg_service_duration, timezone);
     const available = await this.filterBooked(businessId, date, slots);
     return available;
   }
@@ -748,26 +781,43 @@ cron.schedule('0 * * * *', async () => {
 | **Injection SQL** | ORM Supabase + requêtes paramétrées + RLS PostgreSQL |
 | **CSRF / XSS** | `helmet.js`, CORS strict, sanitisation des inputs |
 | **Brute Force** | Rate limiting `/auth` (10 req/min), Supabase lockout automatique |
-| **Webhook spoofing** | Vérification signature HMAC-SHA256 Meta sur chaque webhook |
+| **Webhook spoofing** | Vérification signature HMAC-SHA256 sur body brut + comparaison timing-safe |
+| **Webhook duplicate delivery** | Idempotence sur `message_id` (table événements traités) |
 | **Secrets exposés** | Tokens WhatsApp chiffrés en base (AES-256) |
 | **Accès cross-tenant** | RLS Supabase + vérification `business_id` dans chaque service |
 | **DDoS** | Cloudflare WAF + rate limiter global par IP |
 
 ```js
-// Vérification signature webhook Meta WhatsApp
+// Vérification signature webhook Meta WhatsApp (body brut)
 function verifyWhatsAppSignature(req, res, next) {
   const signature = req.headers['x-hub-signature-256'];
   if (!signature) return res.status(401).json({ error: 'Signature manquante' });
 
-  const expected = crypto
+  const expectedHex = crypto
     .createHmac('sha256', process.env.WHATSAPP_APP_SECRET)
-    .update(JSON.stringify(req.body))
+    .update(req.rawBody) // IMPORTANT: body brut non modifié
     .digest('hex');
 
-  if (`sha256=${expected}` !== signature) {
+  const receivedHex = signature.replace('sha256=', '');
+  const expected = Buffer.from(expectedHex, 'hex');
+  const received = Buffer.from(receivedHex, 'hex');
+
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
     return res.status(403).json({ error: 'Signature invalide — requête rejetée' });
   }
   next();
+}
+```
+
+```js
+// Idempotence webhook
+async function ensureNotProcessed(messageId) {
+  const { data } = await supabase
+    .from('webhook_events')
+    .insert({ provider: 'whatsapp', event_id: messageId })
+    .select('event_id')
+    .single();
+  return !!data; // insertion unique => déjà traité si conflit
 }
 ```
 
@@ -816,7 +866,7 @@ CMD ["node", "src/server.js"]
 name: Deploy Backend
 on:
   push:
-    branches: [main]
+    branches: [backend]
 
 jobs:
   deploy:
@@ -847,4 +897,4 @@ L'architecture backend SmartSalon AI repose sur quatre piliers fondamentaux :
 
 **Scalabilité** — Un seul backend Node.js sert N salons grâce au routing dynamique par numéro WhatsApp, au cache Redis et à la queue BullMQ pour absorber les pics de webhooks.
 
-**Sécurité by design** — Vérification HMAC des webhooks Meta, chiffrement AES-256 des tokens, RLS PostgreSQL, rate limiting par couche et CORS strict forment une défense en profondeur.
+**Sécurité by design** — Vérification HMAC sur body brut, idempotence des webhooks, chiffrement AES-256 des tokens, RLS PostgreSQL, rate limiting par couche et CORS strict forment une défense en profondeur.
