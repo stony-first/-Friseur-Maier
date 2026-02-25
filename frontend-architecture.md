@@ -1,5 +1,5 @@
 # 🖥️ SmartSalon AI — Architecture Frontend
-> React + Vite + TailwindCSS + Zustand + Supabase Auth
+> React + Vite + TailwindCSS + Zustand + TanStack Query + Supabase Auth
 
 ---
 
@@ -155,9 +155,14 @@ Le frontend adopte une architecture **Feature-First** avec une séparation clair
 
 ---
 
-## 3. State Management avec Zustand
+## 3. State Management (Zustand + TanStack Query)
 
-Zustand est choisi pour sa simplicité et sa performance comparé à Redux. Chaque domaine métier possède son store dédié.
+La gestion d'état est séparée en deux responsabilités strictes pour éviter les doubles sources de vérité:
+
+- **Server state** (données API): TanStack Query (`useQuery`, `useMutation`, cache, invalidation, retry)
+- **UI state** (état local cross-feature): Zustand (filtres, modal ouverte, date sélectionnée, préférences UI)
+
+Règle d'architecture: une donnée venant du backend ne doit pas être stockée durablement dans Zustand.
 
 ### Business Store
 
@@ -238,30 +243,33 @@ export const useAppointmentsStore = create((set, get) => ({
 }));
 ```
 
-### Auth Store
+### Auth Store (session robuste)
 
 ```js
 // store/authStore.js
 export const useAuthStore = create((set) => ({
   user:      null,
-  token:     null,
-  isLoading: false,
+  isReady:   false,
+  isLoading: true,
 
   login: async (email, password) => {
     set({ isLoading: true });
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    set({ user: data.user, token: data.session.access_token, isLoading: false });
+    set({ user: data.user, isLoading: false, isReady: true });
   },
 
   logout: async () => {
     await supabase.auth.signOut();
-    set({ user: null, token: null });
+    set({ user: null, isReady: true, isLoading: false });
   },
 
-  setSession: (session) => {
-    set({ user: session?.user || null, token: session?.access_token || null });
-  },
+  // Hydratation session via supabase.auth.getSession + onAuthStateChange
+  setSession: (session) => set({
+    user: session?.user || null,
+    isReady: true,
+    isLoading: false
+  }),
 }));
 ```
 
@@ -272,7 +280,7 @@ export const useAuthStore = create((set) => ({
 ```js
 // core/api/apiClient.js
 import axios from 'axios';
-import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../auth/supabaseClient';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL + '/api/v1',
@@ -280,9 +288,10 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-// Injecter le token JWT automatiquement
-apiClient.interceptors.request.use(config => {
-  const token = useAuthStore.getState().token;
+// Injecter le token JWT automatiquement (source Supabase session)
+apiClient.interceptors.request.use(async (config) => {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -302,6 +311,40 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+```
+
+```js
+// core/query/queryClient.js
+import { QueryClient } from '@tanstack/react-query';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
+      retry: 2,
+      refetchOnWindowFocus: false
+    },
+    mutations: {
+      retry: 1
+    }
+  }
+});
+```
+
+```jsx
+// main.jsx
+<QueryClientProvider client={queryClient}>
+  <App />
+</QueryClientProvider>
+```
+
+### Timezone & dates
+
+Tous les timestamps backend restent en UTC (`TIMESTAMPTZ`) et le frontend convertit à l'affichage avec la timezone du salon (`business.timezone`, ex: `Europe/Paris`).
+
+```js
+formatInTimeZone(appointment.scheduled_at, business.timezone, 'dd/MM/yyyy HH:mm')
 ```
 
 ```js
@@ -723,9 +766,9 @@ VITE_ENV=production
 name: Deploy Frontend
 on:
   push:
-    branches: [main]
+    branches: [frontend]
   pull_request:
-    branches: [main]
+    branches: [frontend]
 
 jobs:
   ci:
@@ -743,7 +786,7 @@ jobs:
 
   deploy:
     needs: ci
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/frontend'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -784,7 +827,7 @@ L'architecture frontend SmartSalon AI repose sur quatre choix techniques structu
 
 **Feature-First avec Clean Architecture** — L'organisation par domaine métier (appointments, services, clients, settings) plutôt que par type de fichier permet à chaque développeur de travailler sur une feature sans impacter les autres, et facilite l'ajout de nouvelles sections au dashboard.
 
-**Zustand pour le state management** — Sa légèreté (2KB), son API sans boilerplate et sa compatibilité avec les Devtools Redux en font le choix idéal pour un dashboard de cette taille. Les stores par domaine restent indépendants et testables unitairement.
+**Séparation stricte des états** — TanStack Query gère le server state (cache, invalidation, retry) et Zustand gère uniquement l'état UI cross-feature. Cette règle réduit les incohérences et simplifie le debugging.
 
 **Optimistic Updates systématiques** — Toutes les mutations (annuler RDV, modifier service, changer statut) mettent à jour l'UI instantanément puis confirment côté serveur, avec rollback automatique. Cela donne une réactivité perçue maximale aux gérants de salon.
 
