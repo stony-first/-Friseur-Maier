@@ -1,53 +1,52 @@
 mindmap
-  root((Frontend Architecture))
+  root((Backend Architecture))
     Stack
-      React.js
-      Axios
-      Supabase Auth
-    Public
-      static assets
-    Src
-      api
-        axiosConfig.js
-        auth.api.js
-        service.api.js
-        appointment.api.js
-        client.api.js
-      components
-        layout
-          Sidebar.jsx
-          Navbar.jsx
-          Layout.jsx
-        dashboard
-          StatsCard.jsx
-          Charts.jsx
-        appointments
-          AppointmentList.jsx
-          AppointmentForm.jsx
-          CalendarView.jsx
-        services
-          ServiceList.jsx
-          ServiceForm.jsx
-        clients
-          ClientList.jsx
-      pages
-        Login.jsx
-        Dashboard.jsx
-        Appointments.jsx
-        Services.jsx
-        Clients.jsx
-      context
-        AuthContext.jsx
-      hooks
-        useAuth.js
-      utils
-        dateFormatter.js
-      App.jsx
-      main.jsx
-    Admin Flow
-      Login
-      Dashboard
-      Appointment Management
-      Service Management
-      Client Management
-      Analytics
+      Node.js
+      Express
+      Supabase
+      WhatsApp Business API
+      NLP Engine
+    Config
+      env.js
+      supabaseClient.js
+      whatsappConfig.js
+    Controllers
+      auth.controller.js
+      service.controller.js
+      appointment.controller.js
+      client.controller.js
+      webhook.controller.js
+    Routes
+      auth.routes.js
+      service.routes.js
+      appointment.routes.js
+      client.routes.js
+      webhook.routes.js
+    Services
+      appointment.service.js
+      availability.service.js
+      reminder.service.js
+      whatsapp.service.js
+      ai.service.js
+    AI Layer
+      intentClassifier.js
+      entityExtractor.js
+      conversationManager.js
+      promptTemplates.js
+    Middlewares
+      auth.middleware.js
+      error.middleware.js
+      validation.middleware.js
+    Utils
+      date.utils.js
+      logger.js
+      constants.js
+    Jobs
+      reminder.job.js
+    Processing Flow
+      WhatsApp Webhook
+      NLP Analysis
+      Business Decision
+      Availability Check
+      Supabase Write
+      WhatsApp Response
