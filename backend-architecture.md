@@ -1,900 +1,824 @@
-# ⚙️ SmartSalon AI — Architecture Backend
-> Node.js + Express + Supabase + WhatsApp Business API
+# ⚙️ Architecture Backend — SaaS Chatbot WhatsApp IA Multi-Entreprises
 
 ---
 
-## 1. Structure du Projet
+## 1. Vue d'ensemble
+
+Le backend est une **API REST** construite avec **Node.js + Fastify**. Il constitue le cœur métier de la plateforme : gestion multi-tenant, orchestration des messages WhatsApp, appels IA, gestion des quotas et des abonnements. Il communique avec **n8n** pour la réception des webhooks et avec **Supabase** comme couche de données.
+
+---
+
+## 2. Stack Technique
+
+| Couche | Technologie | Justification |
+|---|---|---|
+| Runtime | Node.js 20 LTS | Stabilité, performance async |
+| Framework | Fastify | 2x plus rapide qu'Express, plugins robustes |
+| Langage | TypeScript | Typage, maintenabilité, sécurité |
+| Base de données | Supabase (PostgreSQL) | RLS natif, Auth, Realtime |
+| ORM | Prisma | Migrations, type-safety, DX excellent |
+| Cache | Redis (Upstash) | Cache prompts, rate limiting, sessions |
+| Queue | BullMQ | Traitement asynchrone messages, retries |
+| IA | OpenAI / Google Gemini | API interchangeable via abstraction |
+| Validation | Zod | Schémas partagés backend/frontend |
+| Logs | Pino (natif Fastify) | Logs structurés JSON haute performance |
+| Tests | Vitest + Supertest | Tests unitaires et d'intégration |
+| Orchestration | n8n (self-hosted) | Réception webhook WhatsApp |
+
+---
+
+## 3. Structure des Répertoires
 
 ```
-smartsalon-backend/
-├── src/
-│   ├── app.js                        # Point d'entrée Express
-│   ├── server.js                     # Démarrage serveur HTTP
-│   ├── config/
-│   │   ├── database.js               # Configuration Supabase
-│   │   ├── whatsapp.js               # Config WhatsApp Business API
-│   │   ├── ai.js                     # Config OpenAI / Claude
-│   │   └── env.js                    # Variables d'environnement typées
-│   ├── modules/
-│   │   ├── auth/
-│   │   │   ├── auth.routes.js
-│   │   │   ├── auth.controller.js
-│   │   │   ├── auth.service.js
-│   │   │   └── auth.middleware.js
-│   │   ├── businesses/
-│   │   │   ├── businesses.routes.js
-│   │   │   ├── businesses.controller.js
-│   │   │   └── businesses.service.js
-│   │   ├── appointments/
-│   │   │   ├── appointments.routes.js
-│   │   │   ├── appointments.controller.js
-│   │   │   └── appointments.service.js
-│   │   ├── services/
-│   │   │   ├── services.routes.js
-│   │   │   ├── services.controller.js
-│   │   │   └── services.service.js
-│   │   ├── clients/
-│   │   │   ├── clients.routes.js
-│   │   │   ├── clients.controller.js
-│   │   │   └── clients.service.js
-│   │   ├── whatsapp/
-│   │   │   ├── whatsapp.routes.js
-│   │   │   ├── whatsapp.controller.js
-│   │   │   ├── whatsapp.service.js
-│   │   │   └── whatsapp.templates.js
-│   │   └── ai/
-│   │       ├── ai.service.js
-│   │       ├── ai.prompts.js
-│   │       └── conversation.manager.js
-│   ├── middleware/
-│   │   ├── auth.middleware.js
-│   │   ├── rateLimiter.js
-│   │   ├── validator.js
-│   │   ├── logger.js
-│   │   └── errorHandler.js
-│   ├── shared/
-│   │   ├── constants.js
-│   │   ├── utils.js
-│   │   └── errors.js
-│   └── jobs/
-│       ├── reminder.job.js           # Rappels automatiques clients
-│       └── cleanup.job.js            # Nettoyage conversations expirées
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-├── .env
-├── .env.example
-├── package.json
-└── Dockerfile
+src/
+├── server.ts                     # Point d'entrée, démarrage Fastify
+├── app.ts                        # Instance Fastify, enregistrement plugins
+│
+├── config/
+│   ├── env.ts                    # Validation variables d'env (Zod)
+│   ├── database.ts               # Initialisation Prisma
+│   ├── redis.ts                  # Connexion Redis
+│   ├── queue.ts                  # Initialisation BullMQ
+│   └── ai.ts                     # Configuration providers IA
+│
+├── modules/
+│   ├── auth/
+│   │   ├── auth.routes.ts
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   └── auth.schema.ts
+│   │
+│   ├── entreprises/
+│   │   ├── entreprises.routes.ts
+│   │   ├── entreprises.controller.ts
+│   │   ├── entreprises.service.ts
+│   │   └── entreprises.schema.ts
+│   │
+│   ├── whatsapp/
+│   │   ├── whatsapp.routes.ts        # Endpoints webhook + config
+│   │   ├── whatsapp.controller.ts
+│   │   ├── whatsapp.service.ts       # Envoi messages via Cloud API
+│   │   ├── whatsapp.verify.ts        # Vérification signature Meta
+│   │   └── whatsapp.schema.ts
+│   │
+│   ├── conversations/
+│   │   ├── conversations.routes.ts
+│   │   ├── conversations.controller.ts
+│   │   ├── conversations.service.ts
+│   │   └── conversations.schema.ts
+│   │
+│   ├── messages/
+│   │   ├── messages.routes.ts
+│   │   ├── messages.controller.ts
+│   │   ├── messages.service.ts       # Logique principale traitement message
+│   │   └── messages.schema.ts
+│   │
+│   ├── ai/
+│   │   ├── ai.service.ts             # Abstraction OpenAI / Gemini
+│   │   ├── ai.prompt.ts              # Construction prompt dynamique
+│   │   └── providers/
+│   │       ├── openai.provider.ts
+│   │       └── gemini.provider.ts
+│   │
+│   ├── subscriptions/
+│   │   ├── subscriptions.routes.ts
+│   │   ├── subscriptions.controller.ts
+│   │   ├── subscriptions.service.ts
+│   │   └── subscriptions.schema.ts
+│   │
+│   ├── billing/
+│   │   ├── billing.routes.ts
+│   │   ├── billing.controller.ts
+│   │   ├── billing.service.ts        # Intégration Stripe / CinetPay
+│   │   └── stripe.webhook.ts         # Handler webhook Stripe
+│   │
+│   └── analytics/
+│       ├── analytics.routes.ts
+│       ├── analytics.controller.ts
+│       └── analytics.service.ts
+│
+├── workers/
+│   ├── message.worker.ts         # Traitement asynchrone messages IA
+│   ├── notification.worker.ts    # Alertes quota dépassé
+│   └── cleanup.worker.ts         # Nettoyage données anciennes
+│
+├── middleware/
+│   ├── authenticate.ts           # Vérification JWT
+│   ├── authorize.ts              # Vérification rôle/plan
+│   ├── rateLimiter.ts            # Rate limiting par IP et entreprise
+│   ├── tenantResolver.ts         # Résolution tenant depuis JWT
+│   ├── requestLogger.ts          # Log des requêtes
+│   └── errorHandler.ts           # Gestionnaire erreurs centralisé
+│
+├── shared/
+│   ├── types/
+│   │   ├── entreprise.types.ts
+│   │   ├── message.types.ts
+│   │   └── ai.types.ts
+│   ├── errors/
+│   │   ├── AppError.ts           # Classe erreur custom
+│   │   ├── HttpError.ts
+│   │   └── errorCodes.ts
+│   └── utils/
+│       ├── logger.ts
+│       ├── crypto.ts             # Chiffrement données sensibles
+│       └── pagination.ts
+│
+└── prisma/
+    ├── schema.prisma
+    └── migrations/
 ```
 
 ---
 
-## 2. Architecture en Couches
+## 4. Schéma de Base de Données (Prisma)
 
-Le backend suit le pattern **MVC étendu** avec 4 couches strictement séparées.
+```prisma
+// prisma/schema.prisma
 
-| Couche | Fichiers | Responsabilité |
-|--------|----------|----------------|
-| **Routes** | `*.routes.js` | Définition endpoints, validation entrante, doc API |
-| **Controllers** | `*.controller.js` | Orchestration req/res, HTTP status codes |
-| **Services** | `*.service.js` | Logique métier pure, règles business |
-| **Data** | Supabase client | Accès PostgreSQL, requêtes, mappage entités |
-
-### Flux d'une requête
-
-```
-Client HTTP
-    ↓
-Express Router
-    ↓
-Middleware Pipeline (Auth → RateLimit → Validation)
-    ↓
-Controller  (req/res handling)
-    ↓
-Service     (Business Logic)
-    ↓
-Supabase    (Data Access)
-    ↓
-PostgreSQL  (Database)
-```
-
-### Architecture Multi-Tenant
-
-Chaque requête est automatiquement **scopée au salon** via le middleware d'authentification. Le `business_id` extrait du JWT est injecté dans toutes les requêtes Supabase. Les **Row Level Security (RLS)** de Supabase garantissent l'isolation totale entre salons.
-
----
-
-## 3. Middleware Pipeline
-
-```js
-// app.js — Pipeline complet dans l'ordre d'exécution
-
-const app = express();
-
-// === LAYER 1: Security ===
-app.use(helmet());                          // Headers HTTP sécurisés
-app.use(cors(corsOptions));                 // CORS configuré par domaine
-app.use(express.json({ limit: '10mb' }));  // Body parsing
-
-// === LAYER 2: Logging ===
-app.use(morganLogger);                      // HTTP request logging
-app.use(requestIdMiddleware);               // UUID unique par requête (x-request-id)
-
-// === LAYER 3: Rate Limiting ===
-app.use('/api/',     generalRateLimiter);   // 100 req/min par IP
-app.use('/api/auth', authRateLimiter);      // 10 req/min
-app.use('/webhook',  webhookRateLimiter);   // 1000 req/min
-
-// === LAYER 4: Routes ===
-app.use('/api/v1', apiRouter);
-app.use('/webhook', webhookRouter);
-
-// === LAYER 5: Error Handler ===
-app.use(notFoundHandler);
-app.use(globalErrorHandler);
-```
-
-### Middleware d'Authentification
-
-```js
-// middleware/auth.middleware.js
-async function authenticate(req, res, next) {
-  const token = req.headers.authorization?.split('Bearer ')[1];
-  if (!token) return res.status(401).json({ error: 'Token manquant' });
-
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return res.status(401).json({ error: 'Token invalide' });
-
-  // Charger et injecter le contexte salon
-  const { data: business } = await supabase
-    .from('businesses')
-    .select('*')
-    .eq('owner_id', user.id)
-    .single();
-
-  req.user     = user;
-  req.business = business; // disponible dans tous les controllers
-  next();
+generator client {
+  provider = "prisma-client-js"
 }
-```
 
----
-
-## 4. Modèles de Données
-
-### Table: `businesses`
-
-```sql
-CREATE TABLE businesses (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id        UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  name            VARCHAR(255) NOT NULL,
-  whatsapp_number VARCHAR(20)  UNIQUE NOT NULL, -- Identifiant unique de l'IA
-  phone           VARCHAR(20),
-  email           VARCHAR(255),
-  address         TEXT,
-  city            VARCHAR(100),
-  country         VARCHAR(100),
-  config          JSONB DEFAULT '{}'::jsonb,    -- Horaires et paramètres métier (pas de secrets)
-  ai_persona      TEXT,                          -- Nom personnalisé de l'IA
-  is_active       BOOLEAN DEFAULT true,
-  subscription    VARCHAR(50) DEFAULT 'free',
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Structure du champ config (JSONB):
--- {
---   "working_hours": { "1": {"open":"09:00","close":"18:00"}, ... },
---   "working_days": [1,2,3,4,5],
---   "avg_service_duration": 45,
---   "timezone": "Europe/Paris",
---   "greeting_message": "Bonjour ! Je suis l'assistante de ...",
---   "language": "fr"
--- }
-```
-
-```sql
--- Secrets stockés séparément (jamais dans config JSONB)
-CREATE TABLE business_credentials (
-  business_id UUID PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
-  provider    VARCHAR(50) NOT NULL, -- whatsapp
-  token_enc   TEXT NOT NULL,        -- token chiffré AES-256-GCM
-  key_version INTEGER NOT NULL DEFAULT 1,
-  updated_at  TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### Table: `salon_services`
-
-```sql
-CREATE TABLE salon_services (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
-  name        VARCHAR(255) NOT NULL,
-  description TEXT,
-  duration    INTEGER NOT NULL,   -- en minutes
-  price       DECIMAL(10,2),
-  category    VARCHAR(100),       -- coupe | couleur | barbe | soin
-  is_active   BOOLEAN DEFAULT true,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### Table: `clients`
-
-```sql
-CREATE TABLE clients (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id     UUID REFERENCES businesses(id) ON DELETE CASCADE,
-  whatsapp_number VARCHAR(20) NOT NULL,
-  name            VARCHAR(255),
-  phone           VARCHAR(20),
-  notes           TEXT,
-  last_visit      TIMESTAMPTZ,
-  visit_count     INTEGER DEFAULT 0,
-  created_at      TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(business_id, whatsapp_number)
-);
-```
-
-### Table: `appointments`
-
-```sql
-CREATE TABLE appointments (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id  UUID REFERENCES businesses(id) ON DELETE CASCADE,
-  client_id    UUID REFERENCES clients(id),
-  service_id   UUID REFERENCES salon_services(id),
-  scheduled_at TIMESTAMPTZ NOT NULL,
-  end_at       TIMESTAMPTZ NOT NULL,
-  status       VARCHAR(50) DEFAULT 'confirmed',
-  -- confirmed | cancelled | completed | no_show
-  notes        TEXT,
-  booked_via   VARCHAR(50) DEFAULT 'whatsapp',  -- whatsapp | dashboard
-  reminder_sent BOOLEAN DEFAULT false,
-  created_at   TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### Table: `conversations`
-
-```sql
-CREATE TABLE conversations (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id     UUID REFERENCES businesses(id) ON DELETE CASCADE,
-  client_id       UUID REFERENCES clients(id),
-  client_phone    VARCHAR(20) NOT NULL,
-  messages        JSONB DEFAULT '[]'::jsonb, -- Historique complet [{role, content, ts}]
-  current_intent  VARCHAR(100),              -- book | cancel | info | other
-  booking_context JSONB DEFAULT '{}'::jsonb, -- Données collectées par l'IA
-  last_message_at TIMESTAMPTZ DEFAULT NOW(),
-  is_active       BOOLEAN DEFAULT true,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### Table: `webhook_events` (idempotence)
-
-```sql
-CREATE TABLE webhook_events (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  provider   VARCHAR(50) NOT NULL,   -- whatsapp
-  event_id   VARCHAR(255) NOT NULL,  -- message_id Meta
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(provider, event_id)
-);
-```
-
-### Row Level Security — Isolation Multi-Tenant
-
-```sql
--- Activer RLS sur toutes les tables
-ALTER TABLE appointments    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE clients         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE salon_services  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversations   ENABLE ROW LEVEL SECURITY;
-
--- Policy universelle: chaque salon ne voit que ses données
-CREATE POLICY "business_isolation" ON appointments
-  FOR ALL USING (
-    business_id = (
-      SELECT id FROM businesses WHERE owner_id = auth.uid()
-    )
-  );
--- Répliquer sur toutes les tables
-```
-
-### Index critiques
-
-```sql
-CREATE INDEX idx_businesses_whatsapp    ON businesses(whatsapp_number);
-CREATE INDEX idx_appointments_biz_date  ON appointments(business_id, scheduled_at);
-CREATE INDEX idx_clients_biz_phone      ON clients(business_id, whatsapp_number);
-CREATE INDEX idx_conversations_active   ON conversations(business_id, client_id, is_active);
-```
-
----
-
-## 5. Services (Business Logic)
-
-### WhatsApp Service — Réception et routage des messages
-
-```js
-// modules/whatsapp/whatsapp.service.js
-class WhatsAppService {
-
-  async processIncomingMessage(webhookPayload) {
-    const { messageId, from, to, message } = this.parsePayload(webhookPayload);
-
-    // Idempotence: ignorer les retries Meta déjà traités
-    const isDuplicate = await this.webhookEventService.isProcessed(messageId);
-    if (isDuplicate) return;
-
-    // 1. Identifier le salon via le numéro destinataire
-    const business = await this.businessService.findByWhatsappNumber(to);
-    if (!business) throw new Error(`Salon introuvable pour ${to}`);
-
-    // 2. Trouver ou créer le client
-    const client = await this.clientService.findOrCreate(business.id, from);
-
-    // 3. Déléguer à l'agent IA
-    const reply = await this.aiService.processMessage({ business, client, message: message.text });
-
-    // 4. Envoyer la réponse WhatsApp
-    const token = await this.credentialsService.getWhatsappToken(business.id);
-    await this.sendMessage(from, reply, token);
-    await this.webhookEventService.markProcessed(messageId);
-  }
-
-  async sendMessage(to, text, token) {
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${PHONE_ID}/messages`,
-      { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-  }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-```
 
-### AI Service — Agent Conversationnel
+// ─── Entreprises ─────────────────────────────────────────
+model Entreprise {
+  id                String         @id @default(uuid())
+  name              String
+  description       String?
+  sector            String?
+  whatsappNumber    String         @unique @map("whatsapp_number")
+  whatsappToken     String?        @map("whatsapp_token")    // chiffré
+  webhookVerifyToken String?       @map("webhook_verify_token")
+  onboardingDone    Boolean        @default(false) @map("onboarding_done")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
-```js
-// modules/ai/ai.service.js
-class AIService {
+  users             User[]
+  aiConfig          AIConfig?
+  conversations     Conversation[]
+  subscription      Subscription?
+  usageStats        UsageStat[]
 
-  async processMessage({ business, client, message }) {
-    // 1. Charger/créer la conversation active
-    const conversation = await this.getActiveConversation(business.id, client.id);
-
-    // 2. Construire le prompt système dynamique
-    const systemPrompt = this.buildSystemPrompt(business);
-
-    // 3. Historique messages + nouveau message
-    const messages = [
-      ...conversation.messages,
-      { role: 'user', content: message }
-    ];
-
-    // 4. Appel LLM avec réponse structurée imposée (JSON schema)
-    const response = await this.callLLMWithSchema({
-      systemPrompt,
-      messages,
-      schema: this.bookingSchema
-    });
-
-    // 5. Validation stricte avant exécution métier
-    const parsed = bookingSchemaValidator.parse(response);
-    const { reply, intent, data } = parsed;
-
-    // 6. Actions selon l'intention détectée
-    if (intent === 'BOOK_APPOINTMENT' && data.isComplete) {
-      await this.appointmentService.create({ business, client, ...data });
-      return this.buildConfirmationMessage(data);
-    }
-
-    if (intent === 'CANCEL_APPOINTMENT') {
-      await this.appointmentService.cancel(data.appointmentId);
-      return 'Votre rendez-vous a été annulé. À bientôt !';
-    }
-
-    // 7. Sauvegarder la conversation
-    await this.updateConversation(conversation.id, message, reply, intent);
-
-    return reply;
-  }
-
-  buildSystemPrompt(business) {
-    const services = business.services
-      .map(s => `- ${s.name} (${s.duration}min, ${s.price}€)`)
-      .join('\n');
-    const hours = this.formatWorkingHours(business.config.working_hours);
-
-    return [
-      `Tu es l'assistante IA du salon "${business.name}".`,
-      `Tu gères UNIQUEMENT les réservations de ce salon.`,
-      `Services disponibles:\n${services}`,
-      `Horaires d'ouverture: ${hours}`,
-      `Ne propose JAMAIS de créneaux en dehors des horaires d'ouverture.`,
-      `Réponds uniquement via le schéma JSON fourni par l'API.`,
-    ].join('\n');
-  }
+  @@map("entreprises")
 }
-```
 
-### Appointment Service — Gestion des créneaux
+// ─── Utilisateurs ────────────────────────────────────────
+model User {
+  id            String     @id @default(uuid())
+  entrepriseId  String     @map("entreprise_id")
+  email         String     @unique
+  role          UserRole   @default(ADMIN)
+  createdAt     DateTime   @default(now()) @map("created_at")
 
-```js
-// modules/appointments/appointments.service.js
-class AppointmentService {
+  entreprise    Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
 
-  async checkAvailability(businessId, dateTime, duration) {
-    const endTime = new Date(dateTime.getTime() + duration * 60000);
+  @@map("users")
+}
 
-    const { data: conflicts } = await supabase
-      .from('appointments')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('status', 'confirmed')
-      .lt('scheduled_at', endTime.toISOString())
-      .gt('end_at', dateTime.toISOString());
+enum UserRole {
+  OWNER
+  ADMIN
+  VIEWER
+}
 
-    return conflicts.length === 0;
-  }
+// ─── Configuration IA ────────────────────────────────────
+model AIConfig {
+  id                String     @id @default(uuid())
+  entrepriseId      String     @unique @map("entreprise_id")
+  systemPrompt      String     @map("system_prompt")
+  tone              String     @default("formel")
+  language          String     @default("fr")
+  maxHistoryMessages Int       @default(10) @map("max_history_messages")
+  openingHoursEnabled Boolean  @default(false) @map("opening_hours_enabled")
+  openingHoursStart String?    @map("opening_hours_start")   // "08:00"
+  openingHoursEnd   String?    @map("opening_hours_end")     // "18:00"
+  timezone          String     @default("Africa/Ouagadougou")
+  aiProvider        String     @default("openai") @map("ai_provider")
+  aiModel           String     @default("gpt-4o-mini") @map("ai_model")
+  faq               Json?      // Array de {question, answer}
+  updatedAt         DateTime   @updatedAt @map("updated_at")
 
-  async getAvailableSlots(businessId, date) {
-    const business  = await this.businessService.findById(businessId);
-    const { working_hours, avg_service_duration, timezone = 'Europe/Paris' } = business.config;
-    const dayOfWeek = new Date(date).getDay();
-    const hours     = working_hours[dayOfWeek];
+  entreprise        Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
 
-    if (!hours) return []; // Jour fermé
+  @@map("ai_configs")
+}
 
-    const slots     = this.generateTimeSlots(hours.open, hours.close, avg_service_duration, timezone);
-    const available = await this.filterBooked(businessId, date, slots);
-    return available;
-  }
+// ─── Conversations ───────────────────────────────────────
+model Conversation {
+  id              String     @id @default(uuid())
+  entrepriseId    String     @map("entreprise_id")
+  clientNumber    String     @map("client_number")
+  clientName      String?    @map("client_name")
+  status          ConvStatus @default(ACTIVE)
+  isHandedOff     Boolean    @default(false) @map("is_handed_off")
+  lastMessageAt   DateTime?  @map("last_message_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
 
-  async create({ businessId, clientId, serviceId, scheduledAt, bookedVia = 'whatsapp' }) {
-    const service = await this.serviceService.findById(serviceId);
-    const endAt   = new Date(new Date(scheduledAt).getTime() + service.duration * 60000);
+  entreprise      Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+  messages        Message[]
 
-    const isAvailable = await this.checkAvailability(businessId, new Date(scheduledAt), service.duration);
-    if (!isAvailable) throw new ConflictError('Ce créneau est déjà réservé');
+  @@unique([entrepriseId, clientNumber])
+  @@map("conversations")
+}
 
-    const { data } = await supabase
-      .from('appointments')
-      .insert({ business_id: businessId, client_id: clientId, service_id: serviceId,
-                scheduled_at: scheduledAt, end_at: endAt.toISOString(), booked_via: bookedVia })
-      .select()
-      .single();
+enum ConvStatus {
+  ACTIVE
+  CLOSED
+  HANDED_OFF
+}
 
-    return data;
-  }
+// ─── Messages ────────────────────────────────────────────
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  role           MessageRole
+  content        String
+  tokensUsed     Int         @default(0) @map("tokens_used")
+  latencyMs      Int?        @map("latency_ms")
+  whatsappMsgId  String?     @unique @map("whatsapp_msg_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ─── Abonnements ─────────────────────────────────────────
+model Subscription {
+  id                 String    @id @default(uuid())
+  entrepriseId       String    @unique @map("entreprise_id")
+  plan               PlanType  @default(BASIC)
+  status             SubStatus @default(ACTIVE)
+  messageLimit       Int       @map("message_limit")
+  messagesUsed       Int       @default(0) @map("messages_used")
+  currentPeriodStart DateTime  @map("current_period_start")
+  currentPeriodEnd   DateTime  @map("current_period_end")
+  stripeCustomerId   String?   @map("stripe_customer_id")
+  stripeSubId        String?   @map("stripe_sub_id")
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  entreprise         Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+enum PlanType {
+  BASIC
+  PRO
+  PREMIUM
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+}
+
+// ─── Statistiques quotidiennes ───────────────────────────
+model UsageStat {
+  id                  String     @id @default(uuid())
+  entrepriseId        String     @map("entreprise_id")
+  date                DateTime   @db.Date
+  totalMessages       Int        @default(0) @map("total_messages")
+  aiMessages          Int        @default(0) @map("ai_messages")
+  humanMessages       Int        @default(0) @map("human_messages")
+  totalTokens         Int        @default(0) @map("total_tokens")
+  avgLatencyMs        Float?     @map("avg_latency_ms")
+  uniqueConversations Int        @default(0) @map("unique_conversations")
+
+  entreprise          Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+
+  @@unique([entrepriseId, date])
+  @@map("usage_stats")
 }
 ```
 
 ---
 
-## 6. Routes & API Endpoints
+## 5. Logique Métier — Traitement d'un Message Entrant
 
-### Auth
+### 5.1 Flux Complet
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | Inscription nouveau salon |
-| `POST` | `/api/v1/auth/login` | Connexion (retourne JWT) |
-| `POST` | `/api/v1/auth/logout` | Déconnexion |
+```
+[Client WhatsApp]
+       │
+       ▼
+[WhatsApp Cloud API]
+       │  POST webhook
+       ▼
+[n8n Workflow]
+  1. Réception webhook
+  2. Vérification signature HMAC-SHA256
+  3. Extraction payload normalisé
+  4. POST vers Backend /api/v1/webhook/message
+       │
+       ▼
+[Backend Fastify]
+  Module: whatsapp/webhook
+  5. Authentification webhook (secret token)
+  6. Déduplication (whatsapp_msg_id unique)
+       │
+       ▼
+  Module: messages/service
+  7. Identifier entreprise via numéro WhatsApp destinataire
+  8. Vérifier abonnement actif (status = ACTIVE)
+  9. Vérifier quota restant (messagesUsed < messageLimit)
+  10. Vérifier heures d'ouverture
+        │
+        ├─ Hors horaires → Message automatique "Fermé"
+        │
+        └─ Dans horaires ──▶ Ajouter job BullMQ
+                                    │
+                                    ▼
+                           [Worker: message.worker]
+                           11. Charger AIConfig entreprise (cache Redis 5min)
+                           12. Charger historique N derniers messages
+                           13. Construire prompt dynamique
+                           14. Appeler AI Provider (OpenAI / Gemini)
+                           15. Recevoir réponse + tokens_used
+                           16. Sauvegarder message IA en DB
+                           17. Incrémenter messagesUsed
+                           18. Mettre à jour UsageStat du jour
+                                    │
+                                    ▼
+                           [WhatsApp Service]
+                           19. Envoyer réponse via WhatsApp Cloud API
+                           20. Confirmer envoi (status: sent)
+```
 
-### Business
+### 5.2 Construction du Prompt Dynamique
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/api/v1/businesses/me` | Profil salon connecté |
-| `PUT` | `/api/v1/businesses/me` | Mettre à jour la configuration |
-| `POST` | `/api/v1/businesses/me/setup` | Configuration initiale (WhatsApp, horaires) |
+```typescript
+// modules/ai/ai.prompt.ts
 
-### Services du Salon
+export function buildPrompt(config: AIConfig, history: Message[], incomingMessage: string): ChatMessage[] {
+  const systemPrompt = `
+${config.systemPrompt}
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/api/v1/services` | Lister les services |
-| `POST` | `/api/v1/services` | Créer un service |
-| `PUT` | `/api/v1/services/:id` | Modifier un service |
-| `DELETE` | `/api/v1/services/:id` | Supprimer un service |
+Entreprise: ${config.entrepriseName}
+Langue: ${config.language}
+Tonalité: ${config.tone}
 
-### Rendez-vous
+${config.faq ? `FAQ disponible:\n${formatFAQ(config.faq)}` : ''}
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/api/v1/appointments` | Lister (filtres: date, status) |
-| `POST` | `/api/v1/appointments` | Créer manuellement |
-| `PUT` | `/api/v1/appointments/:id` | Modifier (status, heure) |
-| `DELETE` | `/api/v1/appointments/:id` | Annuler |
-| `GET` | `/api/v1/appointments/slots` | Créneaux disponibles (`?date=`) |
+Règles:
+- Réponds uniquement en ${config.language}
+- Si tu ne peux pas répondre, propose de transférer à un humain
+- Ne mentionne jamais que tu es une IA sauf si demandé explicitement
+- Sois concis (WhatsApp = messages courts)
+  `.trim();
 
-### Clients
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/api/v1/clients` | Lister les clients |
-| `GET` | `/api/v1/clients/:id` | Détail + historique |
-
-### Statistiques
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/api/v1/stats/overview` | KPIs dashboard |
-
-### Webhook WhatsApp
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `GET` | `/webhook/whatsapp` | Vérification Meta (handshake) |
-| `POST` | `/webhook/whatsapp` | Réception messages entrants |
-
-### Exemple de Controller
-
-```js
-// modules/appointments/appointments.controller.js
-class AppointmentsController {
-
-  async list(req, res) {
-    const { date, status, page = 1 } = req.query;
-    const result = await this.service.list({
-      businessId: req.business.id,  // injecté par auth middleware
-      date, status, page
-    });
-    res.json({ success: true, data: result });
-  }
-
-  async create(req, res) {
-    const { clientId, serviceId, scheduledAt } = req.body;
-    const appointment = await this.service.create({
-      businessId: req.business.id,
-      clientId, serviceId, scheduledAt,
-      bookedVia: 'dashboard'
-    });
-    res.status(201).json({ success: true, data: appointment });
-  }
-
-  async update(req, res) {
-    const { id } = req.params;
-    const updated = await this.service.update(id, req.body, req.business.id);
-    res.json({ success: true, data: updated });
-  }
+  return [
+    { role: 'system', content: systemPrompt },
+    ...history.slice(-config.maxHistoryMessages).map(m => ({
+      role: m.role === 'ASSISTANT' ? 'assistant' : 'user',
+      content: m.content,
+    })),
+    { role: 'user', content: incomingMessage },
+  ];
 }
 ```
 
 ---
 
-## 7. Global Error Handling
+## 6. API REST — Endpoints
 
-```js
-// shared/errors.js — Classes d'erreurs métier typées
-class AppError extends Error {
-  constructor(message, statusCode, code) {
-    super(message);
-    this.statusCode  = statusCode;
-    this.code        = code;
-    this.isOperational = true;
-  }
-}
+### 6.1 Authentification
 
-class NotFoundError    extends AppError {
-  constructor(r)   { super(`${r} introuvable`, 404, 'NOT_FOUND'); }
-}
-class ValidationError  extends AppError {
-  constructor(msg) { super(msg, 400, 'VALIDATION_ERROR'); }
-}
-class UnauthorizedError extends AppError {
-  constructor()    { super('Non autorisé', 401, 'UNAUTHORIZED'); }
-}
-class ConflictError    extends AppError {
-  constructor(msg) { super(msg, 409, 'CONFLICT'); }
-}
+```
+POST   /api/v1/auth/register         Inscription entreprise + user
+POST   /api/v1/auth/login            Connexion
+POST   /api/v1/auth/logout           Déconnexion
+POST   /api/v1/auth/refresh          Refresh token
+POST   /api/v1/auth/forgot-password  Demande reset
+POST   /api/v1/auth/reset-password   Confirmation reset
 ```
 
-```js
-// middleware/errorHandler.js
-function globalErrorHandler(err, req, res, next) {
-  const requestId = req.headers['x-request-id'];
+### 6.2 Entreprise & Configuration
 
-  logger.error({ requestId, message: err.message, stack: err.stack });
+```
+GET    /api/v1/entreprise            Profil entreprise courante
+PATCH  /api/v1/entreprise            Mise à jour profil
+DELETE /api/v1/entreprise            Suppression compte
 
-  if (err.isOperational) {
-    return res.status(err.statusCode).json({
-      success: false,
-      error: { code: err.code, message: err.message },
-      requestId
-    });
-  }
+GET    /api/v1/entreprise/ai-config  Configuration IA
+PUT    /api/v1/entreprise/ai-config  Mise à jour configuration IA
 
-  // Erreur inattendue — ne pas exposer les détails internes
-  res.status(500).json({
-    success: false,
-    error: { code: 'INTERNAL_ERROR', message: 'Une erreur est survenue' },
-    requestId
+GET    /api/v1/entreprise/whatsapp   Statut connexion WhatsApp
+POST   /api/v1/entreprise/whatsapp   Enregistrer numéro + token
+DELETE /api/v1/entreprise/whatsapp   Déconnecter WhatsApp
+```
+
+### 6.3 Webhook WhatsApp (appelé par n8n)
+
+```
+GET    /api/v1/webhook/whatsapp      Vérification webhook Meta (challenge)
+POST   /api/v1/webhook/whatsapp      Réception messages entrants
+```
+
+### 6.4 Conversations
+
+```
+GET    /api/v1/conversations                   Liste avec pagination
+GET    /api/v1/conversations/:id               Détail + messages
+GET    /api/v1/conversations/:id/messages      Messages paginés
+POST   /api/v1/conversations/:id/handoff       Transfert humain
+POST   /api/v1/conversations/:id/close         Fermer conversation
+GET    /api/v1/conversations/export            Export CSV
+```
+
+### 6.5 Abonnements & Facturation
+
+```
+GET    /api/v1/subscription          Plan et quota actuels
+POST   /api/v1/subscription/upgrade  Changer de plan (→ Stripe)
+DELETE /api/v1/subscription/cancel   Annuler abonnement
+
+GET    /api/v1/billing/invoices      Historique factures
+GET    /api/v1/billing/portal        Portail client Stripe
+
+POST   /api/v1/webhooks/stripe       Webhook Stripe (paiement, renouvellement)
+```
+
+### 6.6 Analytics
+
+```
+GET    /api/v1/analytics/overview         KPIs globaux (période)
+GET    /api/v1/analytics/messages         Volume messages dans le temps
+GET    /api/v1/analytics/response-times   Temps de réponse moyen
+GET    /api/v1/analytics/ai-usage         Tokens et coût estimé
+GET    /api/v1/analytics/conversations    Stats conversations
+```
+
+---
+
+## 7. Sécurité
+
+### 7.1 Authentification & Autorisation
+
+```typescript
+// JWT via Supabase Auth — chaque requête porte un Bearer token
+// Le middleware extrait l'entreprise_id depuis le JWT claims
+// Row Level Security (RLS) Supabase renforce l'isolation
+
+// Exemple middleware tenantResolver
+export async function tenantResolverMiddleware(request: FastifyRequest) {
+  const token = request.headers.authorization?.split(' ')[1];
+  const { data: { user } } = await supabase.auth.getUser(token);
+  
+  if (!user) throw new UnauthorizedError();
+  
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    include: { entreprise: true }
   });
+  
+  request.entrepriseId = dbUser.entrepriseId;
+  request.user = dbUser;
+}
+```
+
+### 7.2 Vérification Signature Meta (Webhook)
+
+```typescript
+// modules/whatsapp/whatsapp.verify.ts
+import crypto from 'crypto';
+
+export function verifyMetaSignature(payload: string, signature: string): boolean {
+  const expectedSignature = crypto
+    .createHmac('sha256', process.env.META_APP_SECRET!)
+    .update(payload)
+    .digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(`sha256=${expectedSignature}`),
+    Buffer.from(signature)
+  );
+}
+```
+
+### 7.3 Rate Limiting
+
+```typescript
+// 3 niveaux de rate limiting :
+// 1. Global IP : 1000 req/min par IP
+// 2. Par entreprise : 200 req/min (API)
+// 3. Webhook WhatsApp : 500 msg/min par numéro
+
+// Implémenté via @fastify/rate-limit + Redis comme store
+```
+
+### 7.4 Chiffrement Données Sensibles
+
+```
+Champs chiffrés en AES-256 avant stockage :
+- whatsapp_token (token d'accès WhatsApp Business)
+- stripe_customer_id
+- Clés API IA (si stockées par entreprise)
+
+Librairie : Node.js crypto (natif)
+Clé de chiffrement : ENCRYPTION_KEY (env var, 32 bytes)
+```
+
+---
+
+## 8. Workers & Queues (BullMQ)
+
+### 8.1 Queues Définies
+
+```typescript
+// config/queue.ts
+
+export const Queues = {
+  MESSAGE_PROCESSING: 'message-processing',  // Traitement IA
+  WHATSAPP_SEND: 'whatsapp-send',            // Envoi réponse
+  NOTIFICATION: 'notification',              // Alertes email/quota
+  ANALYTICS_UPDATE: 'analytics-update',      // Mise à jour stats
+};
+```
+
+### 8.2 Configuration Retry
+
+```typescript
+const messageQueue = new Queue(Queues.MESSAGE_PROCESSING, {
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 2000,  // 2s, 4s, 8s
+    },
+    removeOnComplete: 100,  // Garder 100 derniers jobs réussis
+    removeOnFail: 500,
+  },
+});
+```
+
+---
+
+## 9. Gestion Multi-Tenant
+
+```
+Stratégie : Base de données unique avec isolation logique
+
+1. Chaque table inclut entreprise_id
+2. Row Level Security (RLS) Supabase actif sur toutes les tables
+3. Policies RLS : une entreprise ne peut accéder qu'à ses propres données
+4. Le middleware tenantResolver injecte l'entreprise_id sur chaque requête
+5. Toutes les queries Prisma filtrent sur entreprise_id
+
+Exemple RLS Supabase :
+  CREATE POLICY "tenant_isolation" ON conversations
+    FOR ALL USING (entreprise_id = auth.jwt() -> 'entreprise_id');
+```
+
+---
+
+## 10. Cache Redis — Stratégie
+
+| Clé | TTL | Contenu |
+|---|---|---|
+| `ai_config:{entrepriseId}` | 5 min | Configuration IA complète |
+| `subscription:{entrepriseId}` | 2 min | Plan + quota |
+| `whatsapp_status:{entrepriseId}` | 10 min | Statut connexion |
+| `rate_limit:{ip}` | 1 min | Compteur requêtes |
+| `dedup:{whatsappMsgId}` | 24h | Déduplication messages |
+
+---
+
+## 11. Gestion des Erreurs
+
+```typescript
+// shared/errors/AppError.ts
+export class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    public code: string,
+    message: string,
+    public details?: unknown
+  ) {
+    super(message);
+  }
+}
+
+// Codes d'erreur standardisés
+export const ErrorCodes = {
+  SUBSCRIPTION_EXPIRED:    'SUBSCRIPTION_EXPIRED',
+  QUOTA_EXCEEDED:          'QUOTA_EXCEEDED',
+  WHATSAPP_NOT_CONNECTED:  'WHATSAPP_NOT_CONNECTED',
+  AI_PROVIDER_ERROR:       'AI_PROVIDER_ERROR',
+  INVALID_SIGNATURE:       'INVALID_SIGNATURE',
+  TENANT_NOT_FOUND:        'TENANT_NOT_FOUND',
+};
+
+// Format réponse d'erreur unifié
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Quota mensuel atteint. Passez au plan Pro.",
+    "statusCode": 429,
+    "requestId": "req_abc123"
+  }
 }
 ```
 
 ---
 
-## 8. Configuration & Environment
+## 12. Logs (Pino)
+
+```typescript
+// Structure log standard
+{
+  "level": "info",
+  "time": "2024-01-15T10:30:00.000Z",
+  "requestId": "req_abc123",
+  "entrepriseId": "ent_xyz",
+  "event": "message.processed",
+  "tokensUsed": 342,
+  "latencyMs": 1205,
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}
+
+// Niveaux utilisés :
+// ERROR  → Erreurs critiques (IA down, DB unreachable)
+// WARN   → Quota à 90%, retry tentative
+// INFO   → Message traité, abonnement mis à jour
+// DEBUG  → Développement uniquement
+```
+
+---
+
+## 13. n8n — Workflow WhatsApp
+
+```
+Workflow : "WhatsApp Message Handler"
+
+Trigger : Webhook (POST /webhook/whatsapp)
+  │
+  ├─ Node: Vérifier signature Meta (Function node)
+  │     Calcul HMAC-SHA256, rejet si invalide (HTTP 403)
+  │
+  ├─ Node: Parser payload WhatsApp
+  │     Extraire : from, body, type, whatsappMsgId
+  │     Filtrer : ignorer status updates (delivered, read)
+  │
+  ├─ Node: HTTP Request → Backend
+  │     POST https://api.domain.com/api/v1/webhook/whatsapp
+  │     Headers: X-Webhook-Secret: {secret}
+  │     Body: payload normalisé
+  │
+  └─ Node: Gestion erreurs
+        Retry sur 5xx (3 fois, backoff 2s)
+        Alert Slack sur échec définitif
+```
+
+---
+
+## 14. Monitoring & Observabilité
+
+```
+APM : Sentry (erreurs + performance)
+Métriques : Prometheus + Grafana (optionnel Phase 2)
+Uptime : UptimeRobot (alertes downtime)
+Logs centralisés : Logtail ou Datadog (Phase 2)
+
+Alertes automatiques :
+  - Taux d'erreur IA > 5% → alerte email
+  - Latence moyenne > 5s → alerte Slack
+  - Quota Redis plein > 80% → alerte
+```
+
+---
+
+## 15. Variables d'Environnement
 
 ```bash
-# .env.example
+# .env
 
-# === Server ===
+# App
 NODE_ENV=production
 PORT=3000
-API_VERSION=v1
+API_BASE_URL=https://api.mondomaine.com
 
-# === Supabase ===
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_ANON_KEY=eyJhbGci...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
+# Supabase
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# === WhatsApp Business API ===
-WHATSAPP_VERIFY_TOKEN=smartsalon_verify_secret
-WHATSAPP_APP_SECRET=fb_app_secret
+# Redis
+REDIS_URL=rediss://...
 
-# === AI Provider ===
-AI_PROVIDER=openai             # openai | anthropic
+# IA
 OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-AI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=AIza...
+DEFAULT_AI_PROVIDER=openai
+DEFAULT_AI_MODEL=gpt-4o-mini
 
-# === Security ===
-JWT_SECRET=super_secret_key_min_32_chars
-CORS_ORIGINS=https://app.smartsalon.ai,https://www.smartsalon.ai
+# WhatsApp
+META_APP_SECRET=abc123...           # Vérification signature webhook
+WEBHOOK_VERIFY_TOKEN=random_string  # Token vérification Meta
 
-# === Rate Limiting ===
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=100
+# Stripe
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
-# === Redis (optionnel — cache + queues) ===
-REDIS_URL=redis://localhost:6379
-```
+# Sécurité
+JWT_SECRET=supersecret256bits
+ENCRYPTION_KEY=32byteshexstring
 
-```js
-// config/env.js — Validation au démarrage
-const required = [
-  'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
-  'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_APP_SECRET',
-  'AI_PROVIDER', 'JWT_SECRET'
-];
+# Webhook interne
+INTERNAL_WEBHOOK_SECRET=secret_n8n_to_backend
 
-required.forEach(key => {
-  if (!process.env[key]) {
-    throw new Error(`Variable d'environnement manquante: ${key}`);
-  }
-});
+# Sentry
+SENTRY_DSN=https://...@sentry.io/...
 ```
 
 ---
 
-## 9. Testing Strategy
+## 16. Déploiement
 
-| Type | Outil | Objectif |
-|------|-------|----------|
-| **Unit** | Jest | Services isolés, logique créneaux, parsing IA |
-| **Integration** | Supertest + Supabase test DB | Routes complètes avec vraie base |
-| **E2E** | Playwright | Flux: message WhatsApp → RDV créé |
-| **Load** | k6 | 1000 webhooks/seconde simultanés |
+### Infrastructure Recommandée
 
-```js
-// tests/unit/appointments.service.test.js
-describe('AppointmentService', () => {
-
-  it('retourne false quand le créneau est déjà réservé', async () => {
-    mockSupabase.from.mockReturnValue({ data: [{ id: 'existing' }] });
-
-    const isAvailable = await service.checkAvailability(
-      'business-1', new Date('2025-03-10T10:00'), 60
-    );
-    expect(isAvailable).toBe(false);
-  });
-
-  it('ne propose jamais de créneaux hors horaires', async () => {
-    const slots = await service.getAvailableSlots('business-1', '2025-03-10');
-    slots.forEach(slot => {
-      expect(slot.hour).toBeGreaterThanOrEqual(9);
-      expect(slot.hour).toBeLessThan(18);
-    });
-  });
-
-  it('lance une ConflictError si créneau indisponible', async () => {
-    jest.spyOn(service, 'checkAvailability').mockResolvedValue(false);
-    await expect(service.create({ businessId: 'b1', scheduledAt: '...' }))
-      .rejects.toThrow(ConflictError);
-  });
-});
+```
+Production :
+  Backend API      → VPS Hetzner CAX21 (4 vCPU, 8GB RAM) — ~12€/mois
+  n8n              → VPS Hetzner CX22 (2 vCPU, 4GB RAM)  —  ~6€/mois
+  Redis            → Upstash (serverless, pay-per-use)    —  ~0-20€/mois
+  Base de données  → Supabase Pro                          — ~25€/mois
+  
+  Total fixe estimé : ~43-63€/mois (hors IA et WhatsApp API)
 ```
 
-```js
-// tests/integration/appointments.test.js
-describe('POST /api/v1/appointments', () => {
-  it('crée un RDV et retourne 201', async () => {
-    const res = await request(app)
-      .post('/api/v1/appointments')
-      .set('Authorization', `Bearer ${testToken}`)
-      .send({ clientId: 'c1', serviceId: 's1', scheduledAt: '2025-03-10T10:00:00Z' });
-
-    expect(res.status).toBe(201);
-    expect(res.body.data).toHaveProperty('id');
-  });
-});
-```
-
----
-
-## 10. Performance Optimizations
-
-| Optimisation | Implémentation |
-|-------------|----------------|
-| **Cache Redis** | Config salon en cache 10 min (`business:{whatsapp_number}`) |
-| **Connection Pooling** | Supabase gère automatiquement le pool PostgreSQL |
-| **Conversation TTL** | Sessions IA expirées après 2h d'inactivité (cleanup job) |
-| **Webhook Queue** | BullMQ pour traiter les webhooks en file d'attente asynchrone |
-| **Pagination** | Cursor-based pagination pour listes longues |
-| **Indexation DB** | Index sur `whatsapp_number`, `business_id`, `scheduled_at` |
-
-```js
-// Cache config salon — évite N requêtes DB par message WhatsApp
-async function getBusinessByWhatsapp(whatsappNumber) {
-  const cacheKey = `business:${whatsappNumber}`;
-  const cached   = await redis.get(cacheKey);
-  if (cached) return JSON.parse(cached);
-
-  const { data } = await supabase
-    .from('businesses')
-    .select('*, salon_services(*)')
-    .eq('whatsapp_number', whatsappNumber)
-    .single();
-
-  await redis.setEx(cacheKey, 600, JSON.stringify(data)); // TTL 10min
-  return data;
-}
-```
-
-```js
-// jobs/cleanup.job.js — Cron toutes les heures
-cron.schedule('0 * * * *', async () => {
-  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-  await supabase
-    .from('conversations')
-    .update({ is_active: false })
-    .eq('is_active', true)
-    .lt('last_message_at', twoHoursAgo.toISOString());
-});
-```
-
----
-
-## 11. Security Best Practices
-
-| Menace | Protection |
-|--------|-----------|
-| **Injection SQL** | ORM Supabase + requêtes paramétrées + RLS PostgreSQL |
-| **CSRF / XSS** | `helmet.js`, CORS strict, sanitisation des inputs |
-| **Brute Force** | Rate limiting `/auth` (10 req/min), Supabase lockout automatique |
-| **Webhook spoofing** | Vérification signature HMAC-SHA256 sur body brut + comparaison timing-safe |
-| **Webhook duplicate delivery** | Idempotence sur `message_id` (table événements traités) |
-| **Secrets exposés** | Tokens WhatsApp chiffrés en base (AES-256) |
-| **Accès cross-tenant** | RLS Supabase + vérification `business_id` dans chaque service |
-| **DDoS** | Cloudflare WAF + rate limiter global par IP |
-
-```js
-// Vérification signature webhook Meta WhatsApp (body brut)
-function verifyWhatsAppSignature(req, res, next) {
-  const signature = req.headers['x-hub-signature-256'];
-  if (!signature) return res.status(401).json({ error: 'Signature manquante' });
-
-  const expectedHex = crypto
-    .createHmac('sha256', process.env.WHATSAPP_APP_SECRET)
-    .update(req.rawBody) // IMPORTANT: body brut non modifié
-    .digest('hex');
-
-  const receivedHex = signature.replace('sha256=', '');
-  const expected = Buffer.from(expectedHex, 'hex');
-  const received = Buffer.from(receivedHex, 'hex');
-
-  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
-    return res.status(403).json({ error: 'Signature invalide — requête rejetée' });
-  }
-  next();
-}
-```
-
-```js
-// Idempotence webhook
-async function ensureNotProcessed(messageId) {
-  const { data } = await supabase
-    .from('webhook_events')
-    .insert({ provider: 'whatsapp', event_id: messageId })
-    .select('event_id')
-    .single();
-  return !!data; // insertion unique => déjà traité si conflit
-}
-```
-
-```js
-// Chiffrement des tokens WhatsApp en base
-const algorithm = 'aes-256-gcm';
-
-function encryptToken(token) {
-  const iv         = crypto.randomBytes(16);
-  const cipher     = crypto.createCipheriv(algorithm, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
-  const encrypted  = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
-  const authTag    = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
-}
-```
-
----
-
-## 12. Deployment
-
-| Composant | Solution recommandée |
-|-----------|---------------------|
-| **Backend API** | Railway / Render / AWS ECS — container Docker |
-| **Base de données** | Supabase Cloud (PostgreSQL managé) |
-| **Queue jobs** | Redis Cloud + BullMQ (Railway add-on) |
-| **Webhook proxy** | Domaine fixe HTTPS obligatoire (Meta exige HTTPS) |
-| **CI/CD** | GitHub Actions → Docker build → Deploy auto |
-| **Monitoring** | Sentry (erreurs) + Datadog APM |
-| **Logs** | Papertrail ou Logtail (centralisé) |
-
-```dockerfile
-# Dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY src/ ./src/
-ENV NODE_ENV=production
-EXPOSE 3000
-HEALTHCHECK CMD curl -f http://localhost:3000/health || exit 1
-CMD ["node", "src/server.js"]
-```
+### Docker Compose (Développement)
 
 ```yaml
-# .github/workflows/deploy.yml
-name: Deploy Backend
-on:
-  push:
-    branches: [backend]
+version: '3.8'
+services:
+  api:
+    build: .
+    ports: ["3000:3000"]
+    environment:
+      - NODE_ENV=development
+    depends_on: [redis]
+    volumes: ["./src:/app/src"]
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run tests
-        run: npm ci && npm test
-      - name: Build & Push Docker image
-        run: |
-          docker build -t smartsalon-backend .
-          docker push registry/smartsalon-backend:latest
-      - name: Deploy to Railway
-        run: railway up --service backend
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  n8n:
+    image: n8nio/n8n
+    ports: ["5678:5678"]
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+```
+
+### CI/CD
+
+```
+GitHub Actions :
+  1. Push sur main → tests automatiques (Vitest)
+  2. Build Docker image
+  3. Push image vers registry (GHCR)
+  4. Deploy sur VPS via SSH (docker pull + restart)
+  5. Health check endpoint /api/v1/health
 ```
 
 ---
 
-## 13. Conclusion
+## 17. Tests
 
-L'architecture backend SmartSalon AI repose sur quatre piliers fondamentaux :
+```
+Tests unitaires (Vitest) :
+  - Services (ai.service, messages.service)
+  - Utilitaires (buildPrompt, verifySignature)
+  - Validation schémas Zod
 
-**Multi-tenancy propre** — L'identification des agents IA via le numéro WhatsApp (`whatsapp_number` unique) combinée aux RLS Supabase garantit une isolation totale entre salons sans complexité applicative supplémentaire.
+Tests d'intégration (Vitest + Supertest) :
+  - Flux message entrant complet (mock IA + WhatsApp)
+  - Gestion quota dépassé
+  - Authentification et isolation tenant
 
-**Séparation des responsabilités** — L'architecture en couches (Routes → Controller → Service → Data) permet de tester chaque composant indépendamment et de faire évoluer la logique métier sans toucher aux routes.
+Tests de charge (k6) :
+  - 100 messages simultanés
+  - Vérifier latence < 3s au 95e percentile
 
-**Scalabilité** — Un seul backend Node.js sert N salons grâce au routing dynamique par numéro WhatsApp, au cache Redis et à la queue BullMQ pour absorber les pics de webhooks.
+Seuil couverture cible : > 75%
+```
 
-**Sécurité by design** — Vérification HMAC sur body brut, idempotence des webhooks, chiffrement AES-256 des tokens, RLS PostgreSQL, rate limiting par couche et CORS strict forment une défense en profondeur.
+---
+
+*Document généré pour le projet SaaS Chatbot WhatsApp IA — Version 1.0*
