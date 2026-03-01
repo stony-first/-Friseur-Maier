@@ -1,10 +1,10 @@
-# 🎨 Architecture Frontend — SaaS Chatbot WhatsApp IA Multi-Entreprises
+﻿# ðŸŽ¨ Architecture Frontend â€” SaaS Chatbot WhatsApp IA Multi-Entreprises
 
 ---
 
 ## 1. Vue d'ensemble
 
-Le frontend est une **Single Page Application (SPA)** construite avec **Next.js 14** (App Router). Elle constitue le tableau de bord web pour les entreprises clientes du SaaS. L'interface est responsive, sécurisée, et conçue pour une expérience multi-tenant fluide.
+Le frontend est une **Single Page Application (SPA)** construite avec **React.js 18** (Vite + React Router). Elle constitue le tableau de bord web pour les entreprises clientes du SaaS. L'interface est responsive, sÃ©curisÃ©e, et conÃ§ue pour une expÃ©rience multi-tenant fluide.
 
 ---
 
@@ -12,18 +12,18 @@ Le frontend est une **Single Page Application (SPA)** construite avec **Next.js 
 
 | Couche | Technologie | Justification |
 |---|---|---|
-| Framework | Next.js 14 (App Router) | SSR/SSG, routing avancé, performance |
-| Langage | TypeScript | Typage fort, maintenabilité |
-| Styling | Tailwind CSS + shadcn/ui | Rapidité UI, composants accessibles |
-| State Management | Zustand | Léger, simple, performant |
+| Framework | React.js 18 (Vite + React Router) | SSR/SSG, routing avancÃ©, performance |
+| Langage | JavaScript (ES6+) | Simplicité, maintenabilité |
+| Styling | Tailwind CSS + shadcn/ui | RapiditÃ© UI, composants accessibles |
+| State Management | Zustand | LÃ©ger, simple, performant |
 | Data Fetching | TanStack Query (React Query) | Cache, refetch, optimistic updates |
-| Formulaires | React Hook Form + Zod | Validation robuste côté client |
-| Auth | Supabase Auth (SSR) | JWT, sessions, OAuth intégré |
-| HTTP Client | Axios | Intercepteurs, gestion erreurs centralisée |
-| Graphiques | Recharts | Charts légers et personnalisables |
+| Formulaires | React Hook Form + Zod | Validation robuste cÃ´tÃ© client |
+| Auth | Supabase Auth (SPA/JWT) | JWT, sessions, OAuth intÃ©grÃ© |
+| HTTP Client | Axios | Intercepteurs, gestion erreurs centralisÃ©e |
+| Graphiques | Recharts | Charts lÃ©gers et personnalisables |
 | Notifications | Sonner (toast) | UX fluide |
-| Icons | Lucide React | Cohérence visuelle |
-| Tests | Jest + React Testing Library | Tests unitaires et d'intégration |
+| Icons | Lucide React | CohÃ©rence visuelle |
+| Tests | Jest + React Testing Library | Tests unitaires et d'intÃ©gration |
 
 ---
 
@@ -31,144 +31,106 @@ Le frontend est une **Single Page Application (SPA)** construite avec **Next.js 
 
 ```
 src/
-├── app/                          # Next.js App Router
-│   ├── (auth)/                   # Groupe de routes publiques
-│   │   ├── login/
-│   │   │   └── page.tsx
-│   │   ├── register/
-│   │   │   └── page.tsx
-│   │   ├── forgot-password/
-│   │   │   └── page.tsx
-│   │   └── layout.tsx            # Layout auth (sans sidebar)
-│   │
-│   ├── (dashboard)/              # Groupe de routes protégées
-│   │   ├── layout.tsx            # Layout principal avec sidebar
-│   │   ├── page.tsx              # Redirect vers /dashboard
-│   │   ├── dashboard/
-│   │   │   └── page.tsx          # Vue d'ensemble
-│   │   ├── onboarding/
-│   │   │   └── page.tsx          # Configuration initiale entreprise
-│   │   ├── whatsapp/
-│   │   │   ├── connect/
-│   │   │   │   └── page.tsx      # Connexion numéro WhatsApp
-│   │   │   └── settings/
-│   │   │       └── page.tsx      # Paramètres webhook
-│   │   ├── ai-config/
-│   │   │   └── page.tsx          # Configuration IA (prompt, tonalité, etc.)
-│   │   ├── conversations/
-│   │   │   ├── page.tsx          # Liste des conversations
-│   │   │   └── [id]/
-│   │   │       └── page.tsx      # Détail d'une conversation
-│   │   ├── analytics/
-│   │   │   └── page.tsx          # Statistiques & rapports
-│   │   ├── billing/
-│   │   │   ├── page.tsx          # Plan & abonnement
-│   │   │   └── invoices/
-│   │   │       └── page.tsx      # Historique factures
-│   │   └── settings/
-│   │       └── page.tsx          # Paramètres compte entreprise
-│   │
-│   ├── api/                      # API Routes Next.js (BFF)
-│   │   └── webhooks/
-│   │       └── stripe/
-│   │           └── route.ts      # Webhook Stripe
-│   │
-│   ├── layout.tsx                # Root layout
-│   └── globals.css
-│
-├── components/
-│   ├── ui/                       # Composants shadcn/ui réexportés
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   ├── input.tsx
-│   │   ├── badge.tsx
-│   │   ├── dialog.tsx
-│   │   └── ...
-│   │
-│   ├── layout/
-│   │   ├── Sidebar.tsx           # Navigation latérale
-│   │   ├── Topbar.tsx            # Barre supérieure
-│   │   ├── MobilNav.tsx          # Navigation mobile
-│   │   └── PageHeader.tsx        # Header de page réutilisable
-│   │
+├── main.jsx                     # Point d'entrée React
+├── App.jsx                      # Router principal
+├── pages/
 │   ├── auth/
-│   │   ├── LoginForm.tsx
-│   │   ├── RegisterForm.tsx
-│   │   └── ResetPasswordForm.tsx
-│   │
+│   │   ├── LoginPage.jsx
+│   │   ├── RegisterPage.jsx
+│   │   └── ForgotPasswordPage.jsx
+│   ├── dashboard/
+│   │   ├── DashboardPage.jsx
+│   │   ├── OnboardingPage.jsx
+│   │   ├── WhatsAppConnectPage.jsx
+│   │   ├── WhatsAppSettingsPage.jsx
+│   │   ├── AIConfigPage.jsx
+│   │   ├── ConversationsPage.jsx
+│   │   ├── ConversationDetailPage.jsx
+│   │   ├── AnalyticsPage.jsx
+│   │   ├── BillingPage.jsx
+│   │   ├── InvoicesPage.jsx
+│   │   └── SettingsPage.jsx
+├── routes/
+│   ├── index.jsx                # Définition des routes React Router
+│   └── ProtectedRoute.jsx       # Protection des routes privées
+├── components/
+│   ├── ui/
+│   │   ├── button.jsx
+│   │   ├── card.jsx
+│   │   ├── input.jsx
+│   │   ├── badge.jsx
+│   │   ├── dialog.jsx
+│   │   └── ...
+│   ├── layout/
+│   │   ├── Sidebar.jsx
+│   │   ├── Topbar.jsx
+│   │   ├── MobileNav.jsx
+│   │   └── PageHeader.jsx
+│   ├── auth/
+│   │   ├── LoginForm.jsx
+│   │   ├── RegisterForm.jsx
+│   │   └── ResetPasswordForm.jsx
 │   ├── onboarding/
-│   │   ├── OnboardingWizard.tsx  # Stepper multi-étapes
-│   │   ├── StepCompany.tsx
-│   │   ├── StepWhatsApp.tsx
-│   │   └── StepAIConfig.tsx
-│   │
+│   │   ├── OnboardingWizard.jsx
+│   │   ├── StepCompany.jsx
+│   │   ├── StepWhatsApp.jsx
+│   │   └── StepAIConfig.jsx
 │   ├── conversations/
-│   │   ├── ConversationList.tsx
-│   │   ├── ConversationItem.tsx
-│   │   ├── MessageBubble.tsx
-│   │   ├── ChatHistory.tsx
-│   │   └── SearchBar.tsx
-│   │
+│   │   ├── ConversationList.jsx
+│   │   ├── ConversationItem.jsx
+│   │   ├── MessageBubble.jsx
+│   │   ├── ChatHistory.jsx
+│   │   └── SearchBar.jsx
 │   ├── analytics/
-│   │   ├── StatsCard.tsx
-│   │   ├── MessagesChart.tsx
-│   │   ├── ResponseTimeChart.tsx
-│   │   └── AIUsageChart.tsx
-│   │
+│   │   ├── StatsCard.jsx
+│   │   ├── MessagesChart.jsx
+│   │   ├── ResponseTimeChart.jsx
+│   │   └── AIUsageChart.jsx
 │   ├── billing/
-│   │   ├── PlanCard.tsx
-│   │   ├── QuotaProgress.tsx
-│   │   └── InvoiceTable.tsx
-│   │
+│   │   ├── PlanCard.jsx
+│   │   ├── QuotaProgress.jsx
+│   │   └── InvoiceTable.jsx
 │   └── shared/
-│       ├── LoadingSpinner.tsx
-│       ├── EmptyState.tsx
-│       ├── ErrorBoundary.tsx
-│       ├── ConfirmDialog.tsx
-│       └── StatusBadge.tsx
-│
+│       ├── LoadingSpinner.jsx
+│       ├── EmptyState.jsx
+│       ├── ErrorBoundary.jsx
+│       ├── ConfirmDialog.jsx
+│       └── StatusBadge.jsx
 ├── hooks/
-│   ├── useAuth.ts                # Hook authentification
-│   ├── useEntreprise.ts          # Hook données entreprise
-│   ├── useConversations.ts       # Hook conversations
-│   ├── useAnalytics.ts           # Hook statistiques
-│   ├── useSubscription.ts        # Hook abonnement
-│   └── useWhatsApp.ts            # Hook statut connexion WhatsApp
-│
+│   ├── useAuth.js
+│   ├── useEntreprise.js
+│   ├── useConversations.js
+│   ├── useAnalytics.js
+│   ├── useSubscription.js
+│   └── useWhatsApp.js
 ├── lib/
 │   ├── supabase/
-│   │   ├── client.ts             # Client Supabase (browser)
-│   │   ├── server.ts             # Client Supabase (server)
-│   │   └── middleware.ts         # Auth middleware SSR
+│   │   ├── client.js
+│   │   └── auth.js
 │   ├── api/
-│   │   ├── client.ts             # Instance Axios + intercepteurs
-│   │   ├── entreprises.ts        # Appels API entreprises
-│   │   ├── conversations.ts      # Appels API conversations
-│   │   ├── analytics.ts          # Appels API analytics
-│   │   └── billing.ts            # Appels API facturation
+│   │   ├── client.js
+│   │   ├── entreprises.js
+│   │   ├── conversations.js
+│   │   ├── analytics.js
+│   │   └── billing.js
 │   └── utils/
-│       ├── formatDate.ts
-│       ├── formatNumber.ts
-│       └── cn.ts                 # Utility classnames
-│
+│       ├── formatDate.js
+│       ├── formatNumber.js
+│       └── cn.js
 ├── store/
-│   ├── useAuthStore.ts           # État authentification global
-│   ├── useEntrepriseStore.ts     # État entreprise courante
-│   └── useUIStore.ts             # État UI (sidebar, modals)
-│
+│   ├── useAuthStore.js
+│   ├── useEntrepriseStore.js
+│   └── useUIStore.js
 ├── types/
-│   ├── entreprise.ts
-│   ├── conversation.ts
-│   ├── message.ts
-│   ├── analytics.ts
-│   └── subscription.ts
-│
-├── middleware.ts                 # Next.js middleware (protection routes)
+│   ├── entreprise.js
+│   ├── conversation.js
+│   ├── message.js
+│   ├── analytics.js
+│   └── subscription.js
 └── constants/
-    ├── plans.ts                  # Définition plans Basic/Pro/Premium
-    └── routes.ts                 # Routes centralisées
+    ├── plans.js
+    └── routes.js
 ```
-
 ---
 
 ## 4. Architecture des Pages
@@ -177,29 +139,29 @@ src/
 
 ```
 / (root)
- └─ Vérification session (middleware)
-     ├─ Non connecté → /login
-     └─ Connecté
-         ├─ Onboarding non complété → /onboarding
-         └─ Onboarding complété → /dashboard
+ â””â”€ VÃ©rification session (ProtectedRoute)
+     â”œâ”€ Non connectÃ© â†’ /login
+     â””â”€ ConnectÃ©
+         â”œâ”€ Onboarding non complÃ©tÃ© â†’ /onboarding
+         â””â”€ Onboarding complÃ©tÃ© â†’ /dashboard
 ```
 
-### 4.2 Onboarding (Wizard 3 étapes)
+### 4.2 Onboarding (Wizard 3 Ã©tapes)
 
 ```
 /onboarding
   Step 1: Informations entreprise
     - Nom, secteur, description
-    - Tonalité souhaitée (formel / décontracté / technique)
+    - TonalitÃ© souhaitÃ©e (formel / dÃ©contractÃ© / technique)
     
   Step 2: Connexion WhatsApp
-    - Saisie numéro WhatsApp Business
+    - Saisie numÃ©ro WhatsApp Business
     - Validation webhook Meta
     - Test de connexion
     
   Step 3: Configuration IA
-    - Prompt système personnalisé
-    - Langue(s) supportée(s)
+    - Prompt systÃ¨me personnalisÃ©
+    - Langue(s) supportÃ©e(s)
     - Heures d'ouverture
     - FAQ initiale
 ```
@@ -208,46 +170,47 @@ src/
 
 ```
 /dashboard
-  ┌─────────────────────────────────────────────┐
-  │  KPIs du jour                               │
-  │  [Conversations] [Messages] [Taux réponse]  │
-  ├─────────────────────────────────────────────┤
-  │  Graphique messages 7 derniers jours        │
-  ├─────────────────────────────────────────────┤
-  │  Quota restant (barre de progression)       │
-  ├─────────────────────────────────────────────┤
-  │  Dernières conversations (5 max)            │
-  └─────────────────────────────────────────────┘
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚  KPIs du jour                               â”‚
+  â”‚  [Conversations] [Messages] [Taux rÃ©ponse]  â”‚
+  â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+  â”‚  Graphique messages 7 derniers jours        â”‚
+  â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+  â”‚  Quota restant (barre de progression)       â”‚
+  â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+  â”‚  DerniÃ¨res conversations (5 max)            â”‚
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
 
-## 5. Gestion de l'État
+## 5. Gestion de l'Ã‰tat
 
 ### 5.1 Zustand Stores
 
-```typescript
-// store/useEntrepriseStore.ts
-interface EntrepriseStore {
-  entreprise: Entreprise | null;
-  isLoading: boolean;
-  setEntreprise: (e: Entreprise) => void;
-  clearEntreprise: () => void;
-}
+```javascript
+// store/useEntrepriseStore.js
+export const useEntrepriseStore = create((set) => ({
+  entreprise: null,
+  isLoading: false,
+  setEntreprise: (entreprise) => set({ entreprise }),
+  clearEntreprise: () => set({ entreprise: null }),
+}));
 
-// store/useAuthStore.ts
-interface AuthStore {
-  user: User | null;
-  session: Session | null;
-  setSession: (s: Session | null) => void;
-}
+// store/useAuthStore.js
+export const useAuthStore = create((set) => ({
+  user: null,
+  session: null,
+  onboardingDone: false,
+  setSession: (session) => set({ session }),
+}));
 ```
 
-### 5.2 TanStack Query — Stratégie de Cache
+### 5.2 TanStack Query â€” StratÃ©gie de Cache
 
-```typescript
-// hooks/useConversations.ts
-export const useConversations = (entrepriseId: string) => {
+```javascript
+// hooks/useConversations.js
+export const useConversations = (entrepriseId) => {
   return useQuery({
     queryKey: ['conversations', entrepriseId],
     queryFn: () => api.conversations.getAll(entrepriseId),
@@ -256,8 +219,8 @@ export const useConversations = (entrepriseId: string) => {
   });
 };
 
-// hooks/useAnalytics.ts
-export const useAnalytics = (range: DateRange) => {
+// hooks/useAnalytics.js
+export const useAnalytics = (range) => {
   return useQuery({
     queryKey: ['analytics', range],
     queryFn: () => api.analytics.get(range),
@@ -268,38 +231,33 @@ export const useAnalytics = (range: DateRange) => {
 
 ---
 
-## 6. Sécurité Frontend
+## 6. SÃ©curitÃ© Frontend
 
-### 6.1 Protection des Routes (Middleware)
+### 6.1 Protection des Routes (React Router)
 
-```typescript
-// middleware.ts
-export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|login|register).*)'],
-};
+```javascript
+// routes/ProtectedRoute.jsx
+import { Navigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
 
-export async function middleware(request: NextRequest) {
-  const supabase = createMiddlewareClient({ req: request, res: NextResponse.next() });
-  const { data: { session } } = await supabase.auth.getSession();
+export default function ProtectedRoute({ children }) {
+  const { session, onboardingDone } = useAuthStore();
 
   if (!session) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    return <Navigate to="/login" replace />;
   }
 
-  // Vérification onboarding complété
-  const onboardingDone = request.cookies.get('onboarding_done');
-  if (!onboardingDone && !request.nextUrl.pathname.startsWith('/onboarding')) {
-    return NextResponse.redirect(new URL('/onboarding', request.url));
+  if (!onboardingDone && window.location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
   }
 
-  return NextResponse.next();
+  return children;
 }
 ```
-
 ### 6.2 Intercepteur Axios
 
-```typescript
-// lib/api/client.ts
+```javascript
+// lib/api/client.js
 axiosInstance.interceptors.request.use(async (config) => {
   const session = await supabase.auth.getSession();
   if (session.data.session?.access_token) {
@@ -322,10 +280,10 @@ axiosInstance.interceptors.response.use(
 
 ### 6.3 Validation Formulaires (Zod)
 
-```typescript
-// Exemple : schéma configuration IA
+```javascript
+// Exemple : schÃ©ma configuration IA
 const AIConfigSchema = z.object({
-  systemPrompt: z.string().min(50, "Le prompt doit faire au moins 50 caractères").max(2000),
+  systemPrompt: z.string().min(50, "Le prompt doit faire au moins 50 caractÃ¨res").max(2000),
   language: z.enum(['fr', 'en', 'ar', 'es']),
   tone: z.enum(['formel', 'decontracte', 'technique']),
   openingHours: z.object({
@@ -340,17 +298,16 @@ const AIConfigSchema = z.object({
 
 ---
 
-## 7. Composants Clés
+## 7. Composants ClÃ©s
 
 ### 7.1 Composant QuotaProgress
 
-```typescript
+```javascript
 // Affiche la consommation du quota mensuel
-interface QuotaProgressProps {
-  used: number;
-  limit: number;
-  plan: 'basic' | 'pro' | 'premium';
-}
+const QuotaProgress = ({ used, limit, plan }) => {
+  const ratio = (used / limit) * 100;
+  return ratio;
+};
 
 // Couleurs dynamiques :
 // < 70% → vert
@@ -360,22 +317,22 @@ interface QuotaProgressProps {
 
 ### 7.2 Composant ChatHistory
 
-```typescript
-// Affiche l'historique d'une conversation en temps réel
-// - Bulles colorées selon rôle (IA = bleu, client = gris)
+```javascript
+// Affiche l'historique d'une conversation en temps rÃ©el
+// - Bulles colorÃ©es selon rÃ´le (IA = bleu, client = gris)
 // - Timestamp sur chaque message
 // - Badge "IA" ou "Humain" sur les messages de l'assistant
-// - Export CSV via bouton téléchargement
+// - Export CSV via bouton tÃ©lÃ©chargement
 ```
 
 ### 7.3 Composant OnboardingWizard
 
-```typescript
+```javascript
 // Stepper avec :
-// - Validation par étape avant de passer à la suivante
+// - Validation par Ã©tape avant de passer Ã  la suivante
 // - Sauvegarde brouillon automatique (localStorage)
 // - Barre de progression visuelle
-// - Possibilité de revenir en arrière sans perdre les données
+// - PossibilitÃ© de revenir en arriÃ¨re sans perdre les donnÃ©es
 ```
 
 ---
@@ -384,11 +341,11 @@ interface QuotaProgressProps {
 
 ```
 Support des langues de l'interface :
-- Français (par défaut)
+- FranÃ§ais (par dÃ©faut)
 - Anglais
-- Arabe (RTL supporté)
+- Arabe (RTL supportÃ©)
 
-Librairie : next-intl
+Librairie : react-i18next
 Dossier : /messages/fr.json, /messages/en.json, /messages/ar.json
 ```
 
@@ -396,14 +353,14 @@ Dossier : /messages/fr.json, /messages/en.json, /messages/ar.json
 
 ## 9. Performance & Optimisations
 
-| Optimisation | Méthode |
+| Optimisation | MÃ©thode |
 |---|---|
-| Code splitting | Automatique via Next.js App Router |
-| Images | next/image avec lazy loading |
-| Polices | next/font avec self-hosting |
+| Code splitting | Automatique via Vite + React.lazy |
+| Images | Balises <img> optimisées + lazy loading natif |
+| Polices | Google Fonts ou self-hosting via CSS |
 | Bundle size | Dynamic imports pour composants lourds (charts) |
-| API calls | TanStack Query avec cache et déduplication |
-| Re-renders | useMemo / useCallback sur composants coûteux |
+| API calls | TanStack Query avec cache et dÃ©duplication |
+| Re-renders | useMemo / useCallback sur composants coÃ»teux |
 | Skeleton loaders | Sur toutes les pages avec fetch asynchrone |
 
 ---
@@ -413,12 +370,12 @@ Dossier : /messages/fr.json, /messages/en.json, /messages/ar.json
 ```
 Tests unitaires (Jest + RTL) :
   - Composants UI critiques
-  - Hooks personnalisés
+  - Hooks personnalisÃ©s
   - Fonctions utilitaires
-  - Validation schémas Zod
+  - Validation schÃ©mas Zod
 
 Tests E2E (Playwright) :
-  - Flux inscription → onboarding → dashboard
+  - Flux inscription â†’ onboarding â†’ dashboard
   - Connexion WhatsApp
   - Visualisation conversations
   - Changement de plan
@@ -432,24 +389,24 @@ Seuil de couverture cible : > 70%
 
 ```bash
 # .env.local
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-NEXT_PUBLIC_API_BASE_URL=https://api.mondomaine.com
-NEXT_PUBLIC_APP_URL=https://app.mondomaine.com
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_API_BASE_URL=https://api.mondomaine.com
+VITE_APP_URL=https://app.mondomaine.com
 STRIPE_PUBLISHABLE_KEY=pk_live_...
-NEXT_PUBLIC_POSTHOG_KEY=phc_...   # Analytics produit (optionnel)
+VITE_POSTHOG_KEY=phc_...   # Analytics produit (optionnel)
 ```
 
 ---
 
-## 12. Déploiement
+## 12. DÃ©ploiement
 
 ```
-Plateforme recommandée : Vercel
-  - Déploiement automatique depuis Git (main → production)
+Plateforme recommandÃ©e : Vercel
+  - DÃ©ploiement automatique depuis Git (main â†’ production)
   - Preview deployments sur chaque PR
-  - Edge Network CDN intégré
-  - Variables d'env gérées dans le dashboard Vercel
+  - Edge Network CDN intÃ©grÃ©
+  - Variables d'env gÃ©rÃ©es dans le dashboard Vercel
 
 Alternative : Netlify ou VPS avec Docker + Nginx
 ```
@@ -460,13 +417,13 @@ Alternative : Netlify ou VPS avec Docker + Nginx
 
 ```
 Nommage :
-  - Composants : PascalCase (ex : ConversationList.tsx)
-  - Hooks : camelCase préfixé "use" (ex : useConversations.ts)
+  - Composants : PascalCase (ex : ConversationList.jsx)
+  - Hooks : camelCase prÃ©fixÃ© "use" (ex : useConversations.js)
   - Types : PascalCase dans /types/
   - Constantes : SCREAMING_SNAKE_CASE
 
 Imports :
-  - Absolus via alias "@/" configuré dans tsconfig
+  - Absolus via alias "@/" configurÃ© dans jsconfig
   - Ex : import { Button } from "@/components/ui/button"
 
 Git :
@@ -476,4 +433,7 @@ Git :
 
 ---
 
-*Document généré pour le projet SaaS Chatbot WhatsApp IA — Version 1.0*
+*Document gÃ©nÃ©rÃ© pour le projet SaaS Chatbot WhatsApp IA â€” Version 1.0*
+
+
+
